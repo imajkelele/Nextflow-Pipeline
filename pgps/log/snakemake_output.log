@@ -1,2 +1,0 @@
-usage: all_functions_nonredundant.py [-h] --input INPUT --output OUTPUT
-all_functions_nonredundant.py: error: the following arguments are required: --output
