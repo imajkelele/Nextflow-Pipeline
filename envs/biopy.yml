@@ -1,0 +1,8 @@
+name: biopy
+channels:
+  - anaconda
+  - bioconda
+  - conda-forge
+dependencies:
+  - anaconda::biopython=1.78.*
+

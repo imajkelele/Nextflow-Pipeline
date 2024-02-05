@@ -1,0 +1,6 @@
+name: pandas
+channels:
+  - conda-forge
+dependencies:
+  - conda-forge::pandas=2.2.*
+

@@ -1,0 +1,7 @@
+name: hmmer
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - bioconda::hmmer=3.4.*
+
