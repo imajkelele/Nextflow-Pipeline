@@ -1,67 +1,76 @@
-sequences, = glob_wildcards('pgps/genomes_test/{sequence}.fna.gz')
+sequences, = glob_wildcards('genomes_test/{sequence}.fna.gz')
 rule all:
     input:
-        'pgps/output/filter_pandas.csv'
+        'output/results.faa'
         
-
-rule orfs:
+rule searchorfs:
+    conda:
+        'envs/biopy.yml'
     input:
-        'pgps/genomes_test/{sequence}.fna.gz'
+        'genomes_test/{sequence}.fna.gz'
     output:
-        'pgps/output/orfs/{sequence}_orf.faa'
+        'output/orfs/{sequence}_orf.faa'
 
     log:
-        'pgps/log/{sequence}_log_orf.log'
+        'log/orfs/{sequence}_log_orf.log'
     shell:
-        '''python3 /scratch/home-users/idzik/pgps/scripts/create_orf.py \
+        '''python3 scripts/search_orfs.py \
 		--input {input} \
 		--output {output} \
 		> {log} 2>&1
-        '''        
+        '''
+        
 rule merge:
     params:
-        mask = rules.orfs.output[0].replace('{sequence}', '*')
+        mask = rules.searchorfs.output[0].replace('{sequence}', '*')
     input:
-        expand(rules.orfs.output, sequence=sequences)
+        expand(rules.searchorfs.output, sequence=sequences)
     output:
-        'pgps/output/merged_orfs.faa'
+        'output/merged_orfs.faa'
     log:
-        'pgps/log/merge.log'
+        'log/merge.log'
     shell:
         '''
         cat {input} > {output} 2> {log}
         '''
 
 rule nonredundant:
+    conda:
+        'envs/biopy.yml'
     input:
         rules.merge.output
     output:
-        'pgps/output/output_nonredundant.faa'
+        'output/nonredundant.faa'
     log:
-        'pgps/log/log_nonredundant.log'
+        'log/nonredundant.log'
     shell:
-        '''python3 /scratch/home-users/idzik/pgps/scripts/nonredundant_orfs.py \
+        '''python3 scripts/nonredundant.py \
 		--input {input} \
 		--output {output} \
 		> {log} 2>&1
         '''
 
-rule search:
+rule hmmersearch:
+    conda:
+        'envs/hmmer.yml'
     params:
         E = 0.01,
         domE = 0.01,
         incE = 0.001,
         incdomE = 0.001,
         o = '/dev/null'
+    threads:
+        16
     input:
-        hmm_domains   = 'pgps/domains.hmm',
+        hmm_domains   = 'input/domains.hmm',
         fasta = rules.nonredundant.output
     output:
-        'pgps/output/hmm_result.out'
+        'output/hmm_result.out'
     log:
-        'pgps/log/blastn/hmm_result.log'
+        'log/hmm_result.log'
     shell:
-        '''hmmsearch -E    {params.E}                   \
+        '''hmmsearch --cpu {threads}                     \
+                   -E    {params.E}                      \
                   --domE  {params.domE}                  \
                   --incE      {params.incE}              \
                   --incdomE   {params.incdomE}           \
@@ -76,15 +85,37 @@ rule search:
         '''
 
 rule filter:
+    conda:
+        'envs/pandas.yml'
     input:
-        rules.search.output
+        rules.hmmersearch.output
     output:
-        'pgps/output/filter_pandas.csv'   
+        'output/filter_hmmer.csv'   
     log:
-        'pgps/log/blastn/filter.log'
+        'log/filter.log'
     shell:
         """
-        python3 /scratch/home-users/idzik/pgps/scripts/hmm_to_pandas.py \
+        python3 scripts/filter_hmmer.py \
         --input {input} \
-        --output {output}\
+        --output {output}
+        > {log} 2>&1\
+        """
+
+rule results:
+    conda:
+        'envs/pandas.yml'
+    input:
+        rules.filter.output
+    output:
+        fasta = 'output/results.faa',
+        gff3 = directory('output/gff3')
+    log:
+        'log/results.log'
+    shell:
+        """
+        python3 scripts/filter_dual.py \
+        --input {input} \
+        --output_fasta {output.fasta} \
+        --output_gff3_folder {output.gff3} \
+        > {log} 2>&1\
         """
