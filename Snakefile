@@ -105,17 +105,20 @@ rule results:
     conda:
         'envs/pandas.yml'
     input:
-        rules.filter.output
+        nonredundant = rules.nonredundant.output,
+        filter_output = rules.filter.output
+        
     output:
         fasta = 'output/results.faa',
-        gff3 = directory('output/gff3')
+        gff3 = 'output/results.gff3'
     log:
         'log/results.log'
     shell:
         """
         python3 scripts/filter_dual.py \
-        --input {input} \
+        --input_nonredundant {input.nonredundant} \
+        --input_filter_hmmer {input.filter_output} \
         --output_fasta {output.fasta} \
-        --output_gff3_folder {output.gff3} \
+        --output_gff3 {output.gff3} \
         > {log} 2>&1\
         """
