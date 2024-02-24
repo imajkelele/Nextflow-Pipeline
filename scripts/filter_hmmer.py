@@ -1,7 +1,7 @@
 import argparse
 import pandas as pd
 import re
-#importuje plik outputowy z hmmer i zwraca wyniki jako csv
+#imports the output file from hmmer and returns the results as csv
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -18,32 +18,32 @@ def hmm_to_pandas(hmm_file,output):
     with open(hmm_file, 'r') as file:
         lines = file.readlines()
 
-    lines = lines[3:-10] #importowanie linii z pominięciem linii opisowych
+    lines = lines[3:-10] #import of lines without description lines
 
-    data = [re.split(r'\s+', re.sub(r'\s+', ' ', line.strip())) for line in lines] #usunięcie białych znaków i podział
+    data = [re.split(r'\s+', re.sub(r'\s+', ' ', line.strip())) for line in lines] #removal of whitespace characters and data splitting
 
     df = pd.DataFrame(data)
 
-    df['description of target'] = df.iloc[:, 22:30].apply(lambda x: ''.join(map(str, x)), axis=1) #nadmiar kolumn przez podzielenie 
+    df['description of target'] = df.iloc[:, 22:30].apply(lambda x: ''.join(map(str, x)), axis=1) #excess columns by dividing
 
-    df = df.drop(df.columns[22:30], axis=1) #usunięcie nadmiaru kolumn
+    df = df.drop(df.columns[22:30], axis=1) #removal of excess columns
 
     column_names = ["tname", "tacc", "tlen", "qname", "qacc", "qlen", "E-value", "seqscore", "seqbias",
-                "#", "of", "c-Evalue", "i-Evalue", "domscore", "dombias", "hmm_from", "hmm_to", "ali_from", "ali_to", "env_from", "env_to", "acc"] #nadanie nazw kolumn
+                "#", "of", "c-Evalue", "i-Evalue", "domscore", "dombias", "hmm_from", "hmm_to", "ali_from", "ali_to", "env_from", "env_to", "acc"] #naming the columns
 
     df.columns = column_names
     numerical_columns = ["tlen", "qlen", "E-value", "seqscore", "seqbias",
-                "#", "of", "c-Evalue", "i-Evalue", "domscore", "dombias", "hmm_from", "hmm_to", "ali_from", "ali_to", "env_from", "env_to", "acc"] #oznaczenie kolumn z danymi numerycznymi
+                "#", "of", "c-Evalue", "i-Evalue", "domscore", "dombias", "hmm_from", "hmm_to", "ali_from", "ali_to", "env_from", "env_to", "acc"] #designation of columns with numerical data
 
     df[numerical_columns] = df[numerical_columns].apply(pd.to_numeric, errors='coerce')
-    df['qcov'] = ((df['hmm_to'] - df['hmm_from'] + 1) / df['qlen']) #wyliczenie qcov
-    df['tcovq'] = ((df['env_to'] - df['env_from'] + 1) / df['tlen']) #wyliczenie tcovq
+    df['qcov'] = ((df['hmm_to'] - df['hmm_from'] + 1) / df['qlen']) #qcov calculation
+    df['tcovq'] = ((df['env_to'] - df['env_from'] + 1) / df['tlen']) #tcovq calculation
 
-    condition1 = df['i-Evalue'] <= 0.01 #filtrowanie po i-evalue <= 0.01
-    condition2 = df['qcov'] >= 0.80 #filtrowanie po qcov > 0.80
-    df = df[condition1 & condition2] #zastosowanie filtrowania
+    condition1 = df['i-Evalue'] <= 0.01 #filtering by i-evalue <= 0.01
+    condition2 = df['qcov'] >= 0.80 #filtering by qcov > 0.80
+    df = df[condition1 & condition2] #applying filters
     
-    df.to_csv(output, index=False) #zapis do pliku
+    df.to_csv(output, index=False) #writing to the file
 
 
 if __name__ == '__main__':

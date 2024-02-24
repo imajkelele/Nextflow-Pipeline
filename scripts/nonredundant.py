@@ -3,7 +3,7 @@ import argparse
 from collections import namedtuple
 
 
-#parsowanie inputu i outputu jako ścieżki
+#parsing input and output as a path
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -15,19 +15,19 @@ def parse_args():
     args = parser.parse_args()
     return args
 
-#szukanie sekwencji nieredundantnych 
+#searching for nonredundant sequences
 def read_nonr_seqs(file_path, output_path):
-    seq_hashes = set() #set przechowuje unikalne wartości 
+    seq_hashes = set() #set stores unique values
     
-    records = list(SeqIO.parse(file_path, "fasta")) #odczytywanie pliku fasta
+    records = list(SeqIO.parse(file_path, "fasta")) #reading the fasta file
     
-    f = open(output_path, 'w') #zapisywanie do pliku
+    f = open(output_path, 'w') #writing to the file
 
     for record in records:
-        seq_hash = hash(str(record.seq)) #hashowanie zamienia sekwencje na ciąg numeryczny, optymalizuje porównywanie sekwencji
+        seq_hash = hash(str(record.seq)) #hashing converts sequences into a numerical sequence, optimises sequence comparison
         if seq_hash not in seq_hashes: 
-            seq_hashes.add(seq_hash) #dodanie nowej wartości do setu, jeśli jeszcze tam nie występuje
-            f.write(f'>{record.id}\n{record.seq}\n') #zapisanie do pliku
+            seq_hashes.add(seq_hash) #adding a new value to the set if it is not already there
+            f.write(f'>{record.id}\n{record.seq}\n') #saving to file
 
     f.close()
 

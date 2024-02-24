@@ -9,94 +9,57 @@ import argparse
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--input',  required=True,
+    parser.add_argument('--input_nonredundant',  required=True,
+                        help='Fasta file with nonredundant sequences')
+    parser.add_argument('--input_filter_hmmer',  required=True,
                         help='Filtered Hmmer Output File')
     parser.add_argument('--output_fasta', required=True,
                         help='Fasta file with sequences that contain both Peptidase_M23 and SH3_5 domain')
-    parser.add_argument('--output_gff3_folder', required=True,
-                        help='Output folder for gff3 files')
+    parser.add_argument('--output_gff3', required=True,
+                        help='Output gff3 file')
 
     args = parser.parse_args()
     return args
 
-#skrypt bliźniaczy do readseqs z search_orfs.py
-def read_seqs(file_path):
-    NuclSeq = namedtuple('NuclSeq', ['header', 'sequence', 'file_id'])
-    seq_data = []
 
-    with gzip.open(file_path, "rt") if file_path.endswith(".fna.gz") else open(file_path) as handle:
-        for record in SeqIO.parse(handle, "fasta"):
-            sequence_id = record.id
-            file_and_id = f"{os.path.basename(file_path)[:15]}_{sequence_id}"
-            seq_data.append(NuclSeq(record.description, str(record.seq), file_and_id))
+def convert_df_to_gff3(df, output_gff3):
+    with open(output_gff3, 'w') as output_handle:
+        output_handle.write("##gff\n")
+        for index, row in df.iterrows():
+            seq_name = row['tname']
+            source = 'HMMER'
+            feature_type = row['qname']
+            score = row['seqscore']
 
-    return seq_data
+            # Modify this line according to the desired GFF3 format
+            gff_line = f"{seq_name}\t{source}\t{feature_type}\t{score}\n"
+            output_handle.write(gff_line)
 
-#zapisuje do pliku fasta sekwencje których sname matchuje te z filtrowanego wyniku hmmer
-def create_final_fasta(df,output_file,genomes_folder="genomes_test"):
-    matching_sequences = set()
+import pandas as pd
+from Bio import SeqIO
 
-    for index, row in df.iterrows():
-        file = row['aname'] #aname- ex. GCA_001230465.1
-        sname = row['sname'] #sname- ex. CTZB01000116.1
-        file_path = f'{genomes_folder}/{file}_genomic.fna.gz' #w pliku aname
-        sequences = read_seqs(file_path)
+def find_matching_sequences_df(input_fasta, input_csv, output_fasta,output_gff3):
+    # Wczytaj dane z pliku CSV do DataFrame
+    df = pd.read_csv(input_csv)
+    df = df.groupby('tname').filter(lambda group: any(group['qname'] == 'Peptidase_M23') and any(group['qname'] == 'SH3_5')) 
 
-        for seq in sequences:
-            if sname in seq.header: #szuka sekwencji odpowiadającym sname
-                matching_sequences.add(f'>{seq.header}\n{seq.sequence}\n')
+    # Znajdź sekwencje z pliku FASTA, których ID znajduje się w kolumnie 'tname' DataFrame
+    matching_sequences = []
+    with open(input_fasta, 'r') as fastafile:
+        for record in SeqIO.parse(fastafile, 'fasta'):
+            seq_id = record.id
+            if seq_id in df['tname'].values:
+                matching_sequences.append(record)
 
-    with open(output_file, 'w') as output_handle:
-        output_handle.write(''.join(matching_sequences)) #zapisuje je do jednego finalnego pliku fasta
+    # Zapisz znalezione sekwencje do nowego pliku FASTA
+    with open(output_fasta, 'w') as outputfile:
+        SeqIO.write(matching_sequences, outputfile, 'fasta')
+    
+    convert_df_to_gff3(df, output_gff3)
 
-
-def convert_df_to_gff3(df, output_folder):
-    os.makedirs(output_folder, exist_ok=True)
-
-    # Grupowanie DataFrame według unikalnych wartości 'sname'
-    grouped_df = df.groupby('sname')
-
-    for sname, group in grouped_df:
-        # Tworzenie nazwy pliku GFF3 dla danego 'sname'
-        output_file_path = os.path.join(output_folder, f'{sname}.gff3')
-
-        with open(output_file_path, 'w') as output_handle: #to trzeba dostoswać do tego co chcemy mieć w plikach gff3
-            output_handle.write("##gff\n")
-            for index, row in group.iterrows():
-                seq_name = row['sname']
-                source = 'HMMER'
-                feature_type = row['qname']
-                start_pos = row['start']
-                end_pos = row['stop']
-                comp = row['comp']
-                score = row['seqscore']
-                strand = '+' if start_pos <= end_pos else '-'
-
-                # Tworzenie linii GFF3 i zapis do pliku
-                gff_line = f"{seq_name}\t{source}\t{feature_type}\t{start_pos}\t{end_pos}\t{score}\t{strand}\n"
-                output_handle.write(gff_line)
-
-#modyfikacje pofiltrowanego pliku outputowego hmmer
-def extract_dual(hmmer_out,output_fasta,output_gff3):
-    df = pd.read_csv(hmmer_out)
-
-    df[['GCA', 'aname', 'sname', 'start', 'stop', 'comp']] = df['tname'].str.split('_', expand=True) #podzielenie pierwszwej kolumny żeby wyizolować aname,sname, start,stop i comp
-
-    df['aname'] = df['GCA'] + '_' + df['aname']  # po podzieleniu przez "_" łączenie aname z powrotem do ex. GCA_001230465.1
-
-    df = df.drop(columns=['GCA', 'tname']) #usunięcie nadmiaru kolumn
-
-    column_order = ['aname', 'sname', 'start', 'stop', 'comp'] + [col for col in df.columns if col not in ['aname', 'sname', 'start', 'stop', 'comp']] #ustawienie w dobrej kolejności
-
-    df = df[column_order]
-
-    #wyizolowanie sekwencji które się duplikują i przynajmniej dla jednego rekordu występuje "Peptidase_M23" i przynajmniej dla jednego "SH3_5"
-    df_duplicates = df.groupby('sname').filter(lambda group: any(group['qname'] == 'Peptidase_M23') and any(group['qname'] == 'SH3_5')) 
-
-    create_final_fasta(df_duplicates,output_fasta) #tworzenie finalnego fasta
-    convert_df_to_gff3(df_duplicates,output_gff3)  #tworzenie plików gff3
 
 
 if __name__ == '__main__':
     args = parse_args()
-    extract_dual(args.input, args.output_fasta, args.output_gff3_folder)
+
+    find_matching_sequences_df(args.input_nonredundant,args.input_filter_hmmer, args.output_fasta, args.output_gff3)
