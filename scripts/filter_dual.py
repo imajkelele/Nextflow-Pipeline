@@ -1,7 +1,4 @@
-import os
-import gzip
 from Bio import SeqIO
-from collections import namedtuple
 import pandas as pd
 import argparse
 
@@ -22,21 +19,41 @@ def parse_args():
     return args
 
 
+def extract_parts(tname):
+    parts = tname.split('_')
+    if parts[5] == 'comp':
+        parts[5] = '+'
+    elif parts[5] == 'revcomp':
+        parts[5] = '-'
+
+    return pd.Series({
+        'seq_id': parts[0]+"_"+parts[1]+"_"+parts[2],
+        'start_pos': parts[3],
+        'stop_pos': parts[4],
+        'comp' : parts[5]
+    })
+
 def convert_df_to_gff3(df, output_gff3):
+    df = df.join(df['tname'].apply(lambda x: extract_parts(x)))
+    df.drop(columns=['tname'], inplace=True)
     with open(output_gff3, 'w') as output_handle:
-        output_handle.write("##gff\n")
+        output_handle.write("##gff-version 3\n")
         for index, row in df.iterrows():
-            seq_name = row['tname']
-            source = 'HMMER'
+            seq_name = row['seq_id']
+            source = 'Genbank'
+            type = 'domain'
+            start = row['start_pos']
+            stop = row['stop_pos']
+            Evalue = row['i-Evalue']
+            strand = row['comp']
+            phase = "."
             feature_type = row['qname']
-            score = row['seqscore']
 
             # Modify this line according to the desired GFF3 format
-            gff_line = f"{seq_name}\t{source}\t{feature_type}\t{score}\n"
+            gff_line = f"{seq_name}\t{source}\t{type}\t{start}\t{stop}\t{Evalue}\t{strand}\t{phase}\t{feature_type}\n"
             output_handle.write(gff_line)
 
-import pandas as pd
-from Bio import SeqIO
+
 
 def find_matching_sequences_df(input_fasta, input_csv, output_fasta,output_gff3):
     # Wczytaj dane z pliku CSV do DataFrame

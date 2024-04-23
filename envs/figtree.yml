@@ -1,0 +1,7 @@
+name: mafft
+channels:
+  - bioconda
+  - conda-forge
+dependencies:
+  - bioconda::figtree=*
+

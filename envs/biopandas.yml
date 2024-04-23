@@ -1,0 +1,7 @@
+name: pandas
+channels:
+  - conda-forge
+dependencies:
+  - conda-forge::pandas=2.2.*
+  - conda-forge::biopython=1.83.*
+

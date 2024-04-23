@@ -1,11 +1,11 @@
 sequences, = glob_wildcards('genomes_test/{sequence}.fna.gz')
 rule all:
     input:
-        'output/results.faa'
+        'output/tree.pdf'
         
 rule searchorfs:
     conda:
-        'envs/biopy.yml'
+        'envs/biopandas.yml'
     input:
         'genomes_test/{sequence}.fna.gz'
     output:
@@ -36,7 +36,7 @@ rule merge:
 
 rule nonredundant:
     conda:
-        'envs/biopy.yml'
+        'envs/biopandas.yml'
     input:
         rules.merge.output
     output:
@@ -86,7 +86,7 @@ rule hmmersearch:
 
 rule filter:
     conda:
-        'envs/pandas.yml'
+        'envs/biopandas.yml'
     input:
         rules.hmmersearch.output
     output:
@@ -103,7 +103,7 @@ rule filter:
 
 rule results:
     conda:
-        'envs/pandas.yml'
+        'envs/biopandas.yml'
     input:
         nonredundant = rules.nonredundant.output,
         filter_output = rules.filter.output
@@ -122,3 +122,108 @@ rule results:
         --output_gff3 {output.gff3} \
         > {log} 2>&1\
         """
+rule changenames:
+    conda:
+        'envs/pandas.yml'
+    input:
+        rules.results.output.fasta
+    output:
+        'output/result_organism_names.faa'
+    log:
+        'log/changenames.log'
+    shell:
+        """
+        python3 scripts/organism_names.py \
+		--input {input} \
+		--output {output} \
+		> {log} 2>&1
+        """
+
+rule cdhit:
+    conda:
+        'envs/cdhit.yml'
+    input:
+        rules.changenames.output
+    output:
+        'output/cdhit_result.faa'
+    log:
+        'log/cdhit.log'
+    shell:
+        """
+        cd-hit -i {input} -o {output} -s 0.9 -aS 0.9
+        """
+
+#    TODO: cluster protein seqs from rules.results.output.fasta using cd-hit,
+#          minimal mutual coverage 0.9, minimal sequence identity 0.9
+
+
+rule mafft:
+    conda:
+        'envs/mafft.yml'
+    input:
+        rules.cdhit.output
+    output:
+        'output/cdhit_result_aligned.faa'
+    log:
+        'log/mafft.log'
+    shell:
+        """
+        mafft {input} > {output}
+        """
+
+rule fasttree:
+    conda:
+        'envs/fasttree.yml'
+    input:
+        rules.mafft.output
+    output:
+        'output/fasttree_out.tree'
+    log:
+        'log/fasttree.log'
+    shell:
+        """
+        FastTree {input} > {output}
+        """
+        
+rule figtree:
+    conda:
+        'envs/figtree.yml'
+    input:
+        rules.fasttree.output
+    output:
+        'output/tree.pdf'
+    log:
+        'log/figtree.log'
+    shell:
+        """
+        figtree -graphic PDF {input} {output}
+        """
+#rule raxml:
+#    conda:
+#        'envs/raxml.yml'
+#    input:
+#        rules.mafft.output
+#    output:
+#        'output/raxml'
+#    params:
+#        path = "/scratch/home-users/idzik/Snakemake_MB"
+#    log:
+#        'log/raxml.log'
+#    shell:
+#        """
+#        raxmlHPC-PTHREADS-SSE3 -T 6 -p 12345 -s {input} -w {params.path} -m PROTCATJTT -n tree
+#        """
+
+#    TODO: build a tree for representative sequences given by cd-hit using
+#          raxmlHPC-PTHREADS-SSE3
+
+#rule dist:
+
+#    TODO: calculate % species representation across clusteres given by cd-hit,
+#          e.g. Cluster 0: 90% S. aureus, 10% S. epidermidis, etc.
+
+#rule tree:
+#    TODO: visualise the tree computed by raxmlHPC-PTHREADS-SSE3, include the
+#          information on the number of sequences and the top species
+#          in a given cluster, e.g. Cluster 0 (13), S. aureus (90%)
+
