@@ -2,5 +2,6 @@ name: raxml
 channels:
   - bioconda
   - conda-forge
-
+dependencies:
+  - bioconda::raxml=8.2.*
 
