@@ -1,4 +1,4 @@
-sequences, = glob_wildcards('genomes_test/{sequence}.fna.gz')
+sequences, = glob_wildcards('genomes_all/{sequence}.fna.gz')
 rule all:
     input:
         'output/tree.pdf'
@@ -7,7 +7,7 @@ rule searchorfs:
     conda:
         'envs/biopandas.yml'
     input:
-        'genomes_test/{sequence}.fna.gz'
+        'genomes_all/{sequence}.fna.gz'
     output:
         'output/orfs/{sequence}_orf.faa'
 
@@ -31,7 +31,9 @@ rule merge:
         'log/merge.log'
     shell:
         '''
-        cat {input} > {output} 2> {log}
+        for file in {input}; do
+        dd if="$file" of="{output}" conv=notrunc oflag=append 2>> "{log}"
+        done
         '''
 
 rule nonredundant:
