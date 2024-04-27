@@ -35,14 +35,11 @@ def change_name(input, output, assembly_summary="https://ftp.ncbi.nlm.nih.gov/ge
 
     merged_df = pd.merge(fasta_df, df, left_on='Accession', right_on='assembly_accession', how='left')
 
-    merged_df['Accession'] = merged_df['Accession'].drop_duplicates() ######
-
-    merged_df.dropna(subset=['Accession'], inplace=True) ##### wyrzuca duplikaty - do przemyślenia
 
     with open(output, 'w') as file:
         for index, row in merged_df.iterrows():
             row['organism_name'] = row['organism_name'].replace(' ', '_') ############## _
-            file.write(f">{row['organism_name']}_{row['Accession']}\n") 
+            file.write(f">{row['organism_name']}_{row['Accession']}_{row['Start']}\n") 
             file.write(f"{row['Sequence']}\n")
 
 if __name__ == '__main__':
